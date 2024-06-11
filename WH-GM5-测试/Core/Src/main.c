@@ -237,7 +237,7 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+//CRC 校验
 int16_t factory_crc16 ( uint8_t *bufData, uint16_t buflen)
 {
     uint16_t TCPCRC = 0xffff;
