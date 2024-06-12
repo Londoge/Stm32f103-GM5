@@ -4,8 +4,6 @@
 #include "dht11.h"
 #define usdelay(X) while(X--);
 
-#ifdef
-
 void Delay_us(unsigned int time)
 {
 	unsigned int temptime;

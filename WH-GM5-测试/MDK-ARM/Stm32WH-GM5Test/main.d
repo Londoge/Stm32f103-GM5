@@ -36,4 +36,4 @@ stm32wh-gm5test\main.o: ../Core/Inc/gpio.h
 stm32wh-gm5test\main.o: ..\User\myuart.h
 stm32wh-gm5test\main.o: ..\User\oled.h
 stm32wh-gm5test\main.o: E:\MCU\keil2\ARM\ARMCC\Bin\..\include\stdio.h
-stm32wh-gm5test\main.o: ..\User\dht11.h
+stm32wh-gm5test\main.o: E:\MCU\keil2\ARM\ARMCC\Bin\..\include\string.h

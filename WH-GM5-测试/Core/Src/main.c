@@ -29,7 +29,7 @@
 #include "myuart.h"
 #include "oled.h"
 #include "stdio.h"
-#include "dht11.h"
+#include "string.h"
 //#include "stdbool.h"
 /* USER CODE END Includes */
 
@@ -40,6 +40,14 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+//设备ID
+#define Device_ID 0x01
+
+//MODBUS-功能ID-读取
+#define MODBUS_READ 0x03
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -50,16 +58,30 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-extern unsigned char text[128];
-extern unsigned char tempw;
-extern unsigned char wp;
-unsigned char rp;
+extern unsigned char text[rx_len];
+uint8_t rx_flag;
+extern unsigned int indx;
+
+unsigned char temp_send[32];  //定义发送数组
+unsigned char send_num = 0;   //定义发送数组指针
+
+struct MODBUS_DATA{
+  unsigned char data1_0;
+  unsigned char data1_1;
+  unsigned char data2_0;
+  unsigned char data2_1;
+  unsigned char data3_0;
+  unsigned char data3_1;
+};
+
+struct MODBUS_DATA modbus_data;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+void Uart_Process(void);
 int16_t factory_crc16 ( uint8_t *bufData, uint16_t buflen);
 /* USER CODE END PFP */
 
@@ -72,19 +94,11 @@ int16_t factory_crc16 ( uint8_t *bufData, uint16_t buflen);
   * @brief  The application entry point.
   * @retval int
   */
-  unsigned char senddata[20];
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  unsigned char rtext[20] = {0};
-  unsigned char tpoint = 0;
-  unsigned char temp[2];
-  unsigned short int tempi;
   unsigned char otext[16];
-  DHT11_Data_TypeDef dht11data = {0,0,0,0,0};
   
-  unsigned char read_flag = 0;
-  unsigned char spoint = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -110,22 +124,40 @@ int main(void)
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   HAL_Delay(50);
-  OLED_Init();
-  OLED_Clear();
-  sprintf((char*)otext,"OLED_Init Succes!");
-  OLED_ShowString(1,1,(char*)otext);
-  HAL_Delay(250);
-  OLED_Clear();
-  
+  // OLED_Init();
+  // OLED_Clear();
+  // sprintf((char*)otext,"OLED Act");
+  // OLED_ShowString(1,1,(char*)otext);
   
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_SET);
 
-  HAL_UART_Receive_IT(&huart1,&tempw,1);
+  
+  HAL_UARTEx_ReceiveToIdle_IT(&WHGM5_huart, text, 16);
+  unsigned short temp_data1 = 25;
+  unsigned short temp_data2 = 300;
+  modbus_data.data1_0 = temp_data1 >> 8;
+  modbus_data.data1_1 = temp_data1;
+  
+  modbus_data.data2_0 = temp_data2 >> 8;
+  modbus_data.data2_1 = temp_data2;
+
   while (1)
   {
+    //如果接收到 一帧数据 进行数据处理
+    if(rx_flag == 1)
+    {
+      rx_flag = 0;
+      // Uart_Process();
+      HAL_UART_Transmit(&WHGM5_huart,text,indx,0xff);
+    }
+    HAL_GPIO_TogglePin(GPIOC,GPIO_PIN_13);
+    HAL_Delay(250);
+//      OLED_ShowString(1,1,(char* )text);
+//      memset(text,0,16);
 //	  // static unsigned char tempx = 0x55;
 //	  // HAL_Delay(1000);
 //		// HAL_UART_Transmit(&huart1,(const uint8_t *)&tempx,1,0xff);
@@ -237,6 +269,103 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+/*
+  主机对从机写操作
+  01             06             00 01           00 17          98 04 
+  从机地址        功能号          数据地址          数据         CRC校验
+
+
+
+  主机对从机读操作
+  01             03            00 01           00 01          D5 CA 
+  从机地址        功能号          数据地址      读取数据个数       CRC校验
+  返回内容：  
+  01         03            02             0017          F8 4A
+  从机地址   功能号     数据字节个数    两个字节数据    CRC校验
+  
+
+
+  --有人云测试： 默认单从机模式 设备地址01 读取功能号03 数据地址为40001起 校验方式为CRC16/MODBUS
+  CRC16|MODBUS 多项式公式 'x16 + x15 + x2 + 1'
+*/
+void Uart_Process(void)
+{
+  //接收一帧数据后  对数据进行处理的函数
+  unsigned char *place = NULL; //数据寄存器地址起始位置
+
+  uint16_t byte_num = 0; //需要填入的数据字节量
+
+  int16_t Check_num = 0; //校验位
+  Check_num = factory_crc16(text,indx-2);
+
+  
+  memset(temp_send,0,32);
+
+  if((Check_num & 0x00ff!= text[indx - 2]) || (Check_num & 0xff00 != text[indx - 1]))
+  {
+    //校验位不符合 舍弃数据
+    return;
+  }
+  else
+  {
+    //CRC通过 进行数据判定
+    if(text[0] != Device_ID) //设备号不符合 抛弃
+      return;      
+    temp_send[0] = Device_ID;
+    
+    //根据 MODBUS-功能ID 来执行操作 
+    switch (text[1])
+    {
+      //读取变量
+      case MODBUS_READ:
+          byte_num = ((text[4] << 8 || text[5]))*2;
+          temp_send[1] = MODBUS_READ;
+          temp_send[2] = byte_num;
+          send_num = 3;
+          place = (&(modbus_data.data1_0) + ((text[2] << 8) | text[3]));
+          while(byte_num)
+          {
+            temp_send[send_num++] = *(place++);
+            temp_send[send_num++] = *(place++);
+            byte_num -= 2;
+          }
+          Check_num = factory_crc16((uint8_t*)temp_send,send_num);
+          temp_send[send_num++] = Check_num >> 8;
+          temp_send[send_num++] = Check_num;
+          HAL_UART_Transmit(&WHGM5_huart,temp_send,send_num,0xff);
+        break;
+      
+      default:
+
+        break;
+    }
+  }
+
+
+  switch (text[0])
+  {
+    case '1':
+      OLED_ShowString(2,1,(char *)text);
+    break;
+    case '2':
+      OLED_ShowString(3,1,(char *)text);
+    break;
+    case '3':
+      OLED_ShowString(4,1,(char *)text);
+    break;
+    default:
+      OLED_ShowString(2,1,(char *)text);
+    break;
+  }
+  // OLED_ShowString(2,1,(char *)text);
+  HAL_UART_Transmit(&WHGM5_huart,text,indx,0xff);
+  indx = 0;
+  memset(text,0,16);
+}
+
+
+
+
 //CRC 校验
 int16_t factory_crc16 ( uint8_t *bufData, uint16_t buflen)
 {
