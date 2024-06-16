@@ -22,6 +22,8 @@ stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_exti.h
 stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_dma.h
 stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_dma_ex.h
 stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_cortex.h
+stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_adc.h
+stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_adc_ex.h
 stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash.h
 stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash_ex.h
 stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_i2c.h
@@ -29,6 +31,7 @@ stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_pwr.h
 stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim.h
 stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim_ex.h
 stm32wh-gm5test\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_uart.h
+stm32wh-gm5test\main.o: ../Core/Inc/adc.h
 stm32wh-gm5test\main.o: ../Core/Inc/i2c.h
 stm32wh-gm5test\main.o: ../Core/Inc/tim.h
 stm32wh-gm5test\main.o: ../Core/Inc/usart.h
@@ -37,3 +40,4 @@ stm32wh-gm5test\main.o: ..\User\myuart.h
 stm32wh-gm5test\main.o: ..\User\oled.h
 stm32wh-gm5test\main.o: E:\MCU\keil2\ARM\ARMCC\Bin\..\include\stdio.h
 stm32wh-gm5test\main.o: E:\MCU\keil2\ARM\ARMCC\Bin\..\include\string.h
+stm32wh-gm5test\main.o: ..\User\dht11.h

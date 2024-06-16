@@ -23,6 +23,5 @@ void DHT_GPIO_SET_OUTPUT(void);
 void DHT_GPIO_SET_INPUT(void);
 uint8_t Read_Byte(void);
 uint8_t Read_DHT11(DHT11_Data_TypeDef *DHT11_Data);
-uint16_t HAL_GetTick_us(void);
 
 #endif

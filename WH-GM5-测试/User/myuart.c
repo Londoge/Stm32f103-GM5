@@ -12,7 +12,7 @@ unsigned int indx;
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
     indx = Size;
-    HAL_UARTEx_ReceiveToIdle_IT(huart, text, 16);
+    HAL_UARTEx_ReceiveToIdle_IT(huart, text, rx_len);
     rx_flag = 1;
 }
 

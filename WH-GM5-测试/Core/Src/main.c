@@ -19,6 +19,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "adc.h"
 #include "i2c.h"
 #include "tim.h"
 #include "usart.h"
@@ -31,6 +32,7 @@
 #include "stdio.h"
 #include "string.h"
 //#include "stdbool.h"
+#include "dht11.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,10 +43,10 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-//è®¾å¤‡ID
+//Éè±¸ID
 #define Device_ID 0x01
 
-//MODBUS-åŠŸèƒ½ID-è¯»å–
+//MODBUS-¹¦ÄÜID-¶ÁÈ¡
 #define MODBUS_READ 0x03
 
 
@@ -62,8 +64,8 @@ extern unsigned char text[rx_len];
 uint8_t rx_flag;
 extern unsigned int indx;
 
-unsigned char temp_send[32];  //å®šä¹‰å‘é€æ•°ç»„
-unsigned char send_num = 0;   //å®šä¹‰å‘é€æ•°ç»„æŒ‡é’ˆ
+unsigned char temp_send[32];  //¶¨Òå·¢ËÍÊı×é
+unsigned char send_num = 0;   //¶¨Òå·¢ËÍÊı×éÖ¸Õë
 
 struct MODBUS_DATA{
   unsigned char data1_0;
@@ -72,9 +74,16 @@ struct MODBUS_DATA{
   unsigned char data2_1;
   unsigned char data3_0;
   unsigned char data3_1;
+  unsigned char data4_0;
+  unsigned char data4_1;
+
+  //add here
 };
 
 struct MODBUS_DATA modbus_data;
+DHT11_Data_TypeDef DHT11_Data;
+
+unsigned short adc1_data;
 
 /* USER CODE END PV */
 
@@ -83,6 +92,7 @@ void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 void Uart_Process(void);
 int16_t factory_crc16 ( uint8_t *bufData, uint16_t buflen);
+unsigned short Get_ADCValue_1(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -122,12 +132,14 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   MX_TIM1_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
   HAL_Delay(50);
-  // OLED_Init();
-  // OLED_Clear();
-  // sprintf((char*)otext,"OLED Act");
-  // OLED_ShowString(1,1,(char*)otext);
+  OLED_Init();
+  OLED_Clear();
+  sprintf((char*)otext,"OLED Act");
+  OLED_ShowString(1,1,(char*)otext);
+  HAL_Delay(50);
   
   /* USER CODE END 2 */
 
@@ -135,94 +147,54 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_SET);
 
-  
   HAL_UARTEx_ReceiveToIdle_IT(&WHGM5_huart, text, 16);
-  unsigned short temp_data1 = 25;
-  unsigned short temp_data2 = 300;
-  modbus_data.data1_0 = temp_data1 >> 8;
-  modbus_data.data1_1 = temp_data1;
-  
-  modbus_data.data2_0 = temp_data2 >> 8;
-  modbus_data.data2_1 = temp_data2;
+  HAL_ADC_Start_IT(&hadc1);
+
 
   while (1)
   {
-    //å¦‚æœæ¥æ”¶åˆ° ä¸€å¸§æ•°æ® è¿›è¡Œæ•°æ®å¤„ç†
+    //Èç¹û½ÓÊÕµ½ Ò»Ö¡Êı¾İ ½øĞĞÊı¾İ´¦Àí
     if(rx_flag == 1)
     {
       rx_flag = 0;
-      // Uart_Process();
-      HAL_UART_Transmit(&WHGM5_huart,text,indx,0xff);
+      Uart_Process();
+	    HAL_Delay(500);
+      // HAL_UART_Transmit(&WHGM5_huart,text,indx,0xff);
+      // memset(text,0,rx_len);
+      // sprintf((char *)otext," %02d,%02d",DHT11_Data.temp_int,DHT11_Data.humi_int);
+      // HAL_UART_Transmit(&WHGM5_huart,otext,6,0xff);
     }
+    adc1_data = Get_ADCValue_1();
+    memset(otext,0,5);
+    sprintf((char *)otext,"%04d",adc1_data);
+    OLED_ShowString(3,1,(char *)otext);
     HAL_GPIO_TogglePin(GPIOC,GPIO_PIN_13);
     HAL_Delay(250);
-//      OLED_ShowString(1,1,(char* )text);
-//      memset(text,0,16);
-//	  // static unsigned char tempx = 0x55;
-//	  // HAL_Delay(1000);
-//		// HAL_UART_Transmit(&huart1,(const uint8_t *)&tempx,1,0xff);
-//    if(!Read_DHT11(&dht11data))
-//    {
-//      sprintf((char*)otext,"temp = %d.%d",dht11data.temp_int,dht11data.temp_deci);
-//      OLED_ShowString(1,1,(char*)otext);
-//      sprintf((char*)otext,"humi = %d.%d",dht11data.humi_int,dht11data.humi_deci);
-//      OLED_ShowString(2,1,(char*)otext);
-//    }
-//    if(rp < wp || ((rp != 0)&&(wp == 0)))
-//    {
-//      // HAL_UART_Transmit(&huart1,&text[rp],1,0xff);
-//      rtext[tpoint++] = text[rp++];
-//		  if(rp >= 128)
-//        rp = 0;
-//    }
-//    if(tpoint == 8)
-//    {
-//      tpoint = 0;
-//      if(rtext[0] == 0x01)
-//      {
-//        switch (rtext[1])
-//        {
-//          case 0x03:
-//              read_flag = 1;
-//            break;
-//          
-//          default:
-//            break;
-//        }
-//        if (read_flag == 1)
-//        {
-//          read_flag = 0;
-//          senddata[0] = 0x01;
-//          senddata[1] = 0x03;
-//          senddata[2] = 0x02;
-//          senddata[3] = 0x00;
-//          switch (rtext[2])
-//          {
-//            case 0x00:
-//                senddata[4] = dht11data.temp_int;
-//              break;
-//            case 0x01:
-//                senddata[4] = dht11data.humi_int;
-//              break;
-//            default:
-//              break;
-//          }
-//          
-//          tempi = factory_crc16((uint8_t *)senddata,5);
-//          senddata[5] = tempi & 0xff;
-//          senddata[6] = (tempi >> 8) & 0xff;
-//          HAL_UART_Transmit(&huart1,(const uint8_t *)senddata,7,0xff);
-//          // HAL_UART_Transmit(&huart1,rtext,6,0xff);
-//          // tempi = factory_crc16((uint8_t *)&rtext,tpoint);
-//          // temp[1] = (tempi >> 8) & 0xff;
-//          // temp[0] = tempi & 0xff;
-//          // HAL_UART_Transmit(&huart1,(const uint8_t *)temp,2,0xff);
-//        }
-//        
-//      }
-//      
-//      
-//    }
+    if(Read_DHT11(&DHT11_Data) == SUCCESS)
+    {
+      memset(otext,0,5);
+      sprintf((char *)otext,"%02d,%02d",DHT11_Data.temp_int,DHT11_Data.humi_int);
+      OLED_ShowString(2,1,(char *)otext);
+      OLED_ShowString(3,1,(char *)"OK");
+    }
+    else
+    {
+      OLED_ShowString(3,1,(char *)"NO");
+    }
+
+    modbus_data.data1_0 = 0;
+    modbus_data.data1_1 = DHT11_Data.temp_int;
+
+    modbus_data.data2_0 = 0;
+    modbus_data.data2_1 = DHT11_Data.humi_int;
+
+    modbus_data.data3_0 = 0x27;
+    modbus_data.data3_1 = 0x10;   // 10k for test
+
+    modbus_data.data4_0 = adc1_data >> 8;
+    modbus_data.data4_1 = adc1_data;
+    
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -270,59 +242,68 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 /*
-  ä¸»æœºå¯¹ä»æœºå†™æ“ä½œ
+  Ö÷»ú¶Ô´Ó»úĞ´²Ù×÷
   01             06             00 01           00 17          98 04 
-  ä»æœºåœ°å€        åŠŸèƒ½å·          æ•°æ®åœ°å€          æ•°æ®         CRCæ ¡éªŒ
+  ´Ó»úµØÖ·        ¹¦ÄÜºÅ          Êı¾İµØÖ·          Êı¾İ         CRCĞ£Ñé
 
 
 
-  ä¸»æœºå¯¹ä»æœºè¯»æ“ä½œ
+  Ö÷»ú¶Ô´Ó»ú¶Á²Ù×÷
   01             03            00 01           00 01          D5 CA 
-  ä»æœºåœ°å€        åŠŸèƒ½å·          æ•°æ®åœ°å€      è¯»å–æ•°æ®ä¸ªæ•°       CRCæ ¡éªŒ
-  è¿”å›å†…å®¹ï¼š  
-  01         03            02             0017          F8 4A
-  ä»æœºåœ°å€   åŠŸèƒ½å·     æ•°æ®å­—èŠ‚ä¸ªæ•°    ä¸¤ä¸ªå­—èŠ‚æ•°æ®    CRCæ ¡éªŒ
+  ´Ó»úµØÖ·        ¹¦ÄÜºÅ          Êı¾İµØÖ·      ¶ÁÈ¡Êı¾İ¸öÊı       CRCĞ£Ñé
+  ·µ»ØÄÚÈİ£º  
+  01         03            02             00 17          F8 4A
+  ´Ó»úµØÖ·   ¹¦ÄÜºÅ     Êı¾İ×Ö½Ú¸öÊı    Á½¸ö×Ö½ÚÊı¾İ    CRCĞ£Ñé
   
 
 
-  --æœ‰äººäº‘æµ‹è¯•ï¼š é»˜è®¤å•ä»æœºæ¨¡å¼ è®¾å¤‡åœ°å€01 è¯»å–åŠŸèƒ½å·03 æ•°æ®åœ°å€ä¸º40001èµ· æ ¡éªŒæ–¹å¼ä¸ºCRC16/MODBUS
-  CRC16|MODBUS å¤šé¡¹å¼å…¬å¼ 'x16 + x15 + x2 + 1'
+  --ÓĞÈËÔÆ²âÊÔ£º Ä¬ÈÏµ¥´Ó»úÄ£Ê½ Éè±¸µØÖ·01 ¶ÁÈ¡¹¦ÄÜºÅ03 Êı¾İµØÖ·Îª40001Æğ Ğ£Ñé·½Ê½ÎªCRC16/MODBUS
+  CRC16|MODBUS ¶àÏîÊ½¹«Ê½ 'x16 + x15 + x2 + 1'
 */
+
+unsigned short Get_ADCValue_1(void)
+{
+  int ADC_Num;
+	HAL_ADC_Start_IT(&hadc1);
+  ADC_Num = HAL_ADC_GetValue(&hadc1);
+  return (ADC_Num);
+}
+
 void Uart_Process(void)
 {
-  //æ¥æ”¶ä¸€å¸§æ•°æ®å  å¯¹æ•°æ®è¿›è¡Œå¤„ç†çš„å‡½æ•°
-  unsigned char *place = NULL; //æ•°æ®å¯„å­˜å™¨åœ°å€èµ·å§‹ä½ç½®
+  //½ÓÊÕÒ»Ö¡Êı¾İºó  ¶ÔÊı¾İ½øĞĞ´¦ÀíµÄº¯Êı
+  unsigned char *place = NULL; //Êı¾İ¼Ä´æÆ÷µØÖ·ÆğÊ¼Î»ÖÃ
 
-  uint16_t byte_num = 0; //éœ€è¦å¡«å…¥çš„æ•°æ®å­—èŠ‚é‡
+  uint16_t byte_num = 0; //ĞèÒªÌîÈëµÄÊı¾İ×Ö½ÚÁ¿
 
-  int16_t Check_num = 0; //æ ¡éªŒä½
+  int16_t Check_num = 0; //Ğ£ÑéÎ»
   Check_num = factory_crc16(text,indx-2);
 
   
   memset(temp_send,0,32);
 
-  if((Check_num & 0x00ff!= text[indx - 2]) || (Check_num & 0xff00 != text[indx - 1]))
+  if(((Check_num & 0x00ff)!= text[indx - 2]) || (((Check_num >> 8) & 0x00ff) != text[indx - 1]))
   {
-    //æ ¡éªŒä½ä¸ç¬¦åˆ èˆå¼ƒæ•°æ®
+    //Ğ£ÑéÎ»²»·ûºÏ ÉáÆúÊı¾İ
     return;
   }
   else
   {
-    //CRCé€šè¿‡ è¿›è¡Œæ•°æ®åˆ¤å®š
-    if(text[0] != Device_ID) //è®¾å¤‡å·ä¸ç¬¦åˆ æŠ›å¼ƒ
+    //CRCÍ¨¹ı ½øĞĞÊı¾İÅĞ¶¨
+    if(text[0] != Device_ID) //Éè±¸ºÅ²»·ûºÏ Å×Æú
       return;      
     temp_send[0] = Device_ID;
     
-    //æ ¹æ® MODBUS-åŠŸèƒ½ID æ¥æ‰§è¡Œæ“ä½œ 
+    //¸ù¾İ MODBUS-¹¦ÄÜID À´Ö´ĞĞ²Ù×÷ 
     switch (text[1])
     {
-      //è¯»å–å˜é‡
+      //¶ÁÈ¡±äÁ¿
       case MODBUS_READ:
-          byte_num = ((text[4] << 8 || text[5]))*2;
+          byte_num = ((text[4] << 8 | text[5]))*2;
           temp_send[1] = MODBUS_READ;
           temp_send[2] = byte_num;
           send_num = 3;
-          place = (&(modbus_data.data1_0) + ((text[2] << 8) | text[3]));
+          place = (&(modbus_data.data1_0) + ((text[2] << 8) | text[3])*2);
           while(byte_num)
           {
             temp_send[send_num++] = *(place++);
@@ -330,9 +311,9 @@ void Uart_Process(void)
             byte_num -= 2;
           }
           Check_num = factory_crc16((uint8_t*)temp_send,send_num);
-          temp_send[send_num++] = Check_num >> 8;
           temp_send[send_num++] = Check_num;
-          HAL_UART_Transmit(&WHGM5_huart,temp_send,send_num,0xff);
+          temp_send[send_num++] = Check_num >> 8;
+          HAL_UART_Transmit(&WHGM5_huart,temp_send,send_num,0xffffffff);
         break;
       
       default:
@@ -340,33 +321,12 @@ void Uart_Process(void)
         break;
     }
   }
-
-
-  switch (text[0])
-  {
-    case '1':
-      OLED_ShowString(2,1,(char *)text);
-    break;
-    case '2':
-      OLED_ShowString(3,1,(char *)text);
-    break;
-    case '3':
-      OLED_ShowString(4,1,(char *)text);
-    break;
-    default:
-      OLED_ShowString(2,1,(char *)text);
-    break;
-  }
-  // OLED_ShowString(2,1,(char *)text);
-  HAL_UART_Transmit(&WHGM5_huart,text,indx,0xff);
-  indx = 0;
-  memset(text,0,16);
 }
 
 
 
 
-//CRC æ ¡éªŒ
+//CRC Ğ£Ñé
 int16_t factory_crc16 ( uint8_t *bufData, uint16_t buflen)
 {
     uint16_t TCPCRC = 0xffff;
